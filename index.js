@@ -87,7 +87,7 @@ app.post('/messages', async (req, res) => {
 
 	try {
 		const isUser = await dbUol.collection('messages').findOne({ from: user });
-		console.log("********Is User", isUser);
+		/* console.log("********Is User", isUser); */
 		await dbUol.collection('messages').insertOne({ ...message, from: user, time: now_date })
 		res.sendStatus(201);
 	} catch (error) {
@@ -110,13 +110,10 @@ app.get('/messages', async (req, res) => {
 
 app.post('/status', async (req, res) => {
 	const user = req.headers.user;
-	console.log("****************************")
+/* 	console.log("****************************")
 	console.log("USER STATUS", user);
-	console.log("****************************")
+	console.log("****************************") */
 	const status = req.body;
-
-
-
 
 	/* const validation = messageSchema.validate(message, { abortEarly: true });  */
 	/* 
@@ -127,8 +124,8 @@ app.post('/status', async (req, res) => {
 
 	try {
 		const isUser = await dbUol.collection('participants').findOne({ name: user });
-		console.log("********Is User na rota /status", isUser);
-		console.log("********Is User _ID", isUser._id);
+		 console.log("********Is User na rota /status", isUser); 
+/* 		console.log("********Is User _ID", isUser._id); */
 		const statusUpdate_newobj = { ...isUser, lastStatus: Date.now() };
 
 		//teoria update é melhor. acho que assim vai escrever mais uma vez...
@@ -147,6 +144,7 @@ app.post('/status', async (req, res) => {
 });
 
 async function deleteUser(participantUser){
+	console.log(">>>>>>>>>>>>>>>>>>>>>>>>>> deleteUser() function <<<<<<<<<<<<<<<<<<<<<<<");
 	const messageLogout = {
 		from: participantUser.name,
 		to: 'Todos',
@@ -158,36 +156,40 @@ async function deleteUser(participantUser){
 	try{
 		await dbUol.collection("participants").deleteOne({_id: ObjectId(participantUser._id) })
 		await dbUol.collection("messages").insertOne(messageLogout);
-
 	}
 	catch(err){
-		console.error(error);
+		console.error(err);
 		res.sendStatus(201);
 		/* res.sendStatus(404); */
 	}
 }
 
 function isOnline(participantUser){
-	console.log("entrou isOnline");
-	const timeOff = (participantUser.lastStatus - Date().now);
+	/* console.log("\nentrou isOnline"); */
+
+	const timeOff = (Date.now()- participantUser.lastStatus);
+
 	if(timeOff > 15000){
 		deleteUser(participantUser);
+		console.log("\n\n\n\nuser deletado", participantUser.name);
 	}else{
+		console.log('isOnline True', participantUser.name)
 		return true;
 	}
 }
 
 //removendo a cada 15 segundo participants inativos
 async function removeParticipantsOffline() {
-	const allParticipants = await dbUol.collection('particpants').find({}).toArray();
-	const allParticipantsOnline = allParticipants.filter((participantUser) => isOnline(participantUser))
+	console.log("entra removeParticipantsOffline");
+	const allParticipants = await dbUol.collection('participants').find().toArray();
+	/* console.log("\n##allParticants",allParticipants);  */
+	const allParticipantsOnline = allParticipants.filter((participantUser) => isOnline(participantUser));
+	/* console.log("\n##allParticantsOnline",allParticipantsOnline); */
 };
 
 
-setInterval(removeParticipantsOffline, 15000); 
-
+setInterval(removeParticipantsOffline, 3000); 
 
 app.listen(5000, () => {
 	console.log('Server is listening on port 5000.');
 });
-
