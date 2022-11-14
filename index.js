@@ -31,7 +31,7 @@ const participantSchema = joi.object({
 const messageSchema = joi.object({
 	to: joi.string().required(),
 	text: joi.string().required(),
-	type: joi.string().required()
+	type: joi.string().valid('message','private_message').required()
 });
 
 /* async function isThereParticipant(participantObj){
@@ -57,17 +57,21 @@ async function userExists(userName){
 
 app.post('/participants', async (req, res) => {
 	const participantes = req.body;
-	console.log("participantes", participantes);
+	/* console.log("participantes", participantes); */
 	
 
 /* 	if(!isThereParticipant(participantes)){
 		res.sendStatus(409);
 		return
 	}  */
+	let userName ="";
 
-	
+	//lowercase do nome
+	if(req.body.name){
+		 userName =  req.body.name.toLowerCase();
+	}
 
-	if(await userExists(req.body.name)){
+	if(await userExists(userName)){
 		res.status(409).send('UserName já está logado!');
 		return;
 	};
@@ -99,6 +103,7 @@ app.post('/participants', async (req, res) => {
 
 
 app.get('/participants', async (req, res) => {
+
 	try {
 		const participantsCollection = dbUol.collection("participants");
 		const participantList = await participantsCollection.find({}).toArray();
@@ -113,11 +118,12 @@ app.post('/messages', async (req, res) => {
 	const user = req.headers.user;
 	/* //console.log(">>>>>user from req is", user); */
 	const message = req.body;
+	console.log(message);
 	let now_date = dayjs().format("HH:mm:ss");
-	console.log("post msg")
+	
 	
   	if(!(await userExists(user))){
-		console.log(user, "usuario nao participant, nao pode mandar msg");
+		/* console.log(user, "usuario nao participant, nao pode mandar msg"); */
 		return;
 	};  
 /* 	//console.log("****************")
@@ -147,9 +153,10 @@ app.post('/messages', async (req, res) => {
 });
 
 function messageUserCanSee(messagesList, user){
+	const messagesListReverse =  messagesList.reverse();
 	
-	const messagesToUser = messagesList.filter((message) => (message.to === "Todos" || message.from === user || message.to === user || message.type === "message"));
-	console.log(messagesToUser);
+	const messagesToUser = messagesListReverse.filter((message) => (message.to === "Todos" || message.from === user || message.to === user || message.type === "message"));
+	/* console.log(messagesToUser); */
 	return messagesToUser;
 }
 
@@ -163,7 +170,7 @@ app.get('/messages', async (req, res) => {
 	
 	try {
 		const messageCollection = dbUol.collection("messages");
-		const messagesList = await messageCollection.find({}).limit(limit).toArray();
+		const messagesList = await messageCollection.find({}).sort({$natural:-1}).limit(limit).toArray();
 		res.send(messageUserCanSee(messagesList,user))
 	} catch (error) {
 		res.status(500).send('Deu erro na requisicao das mensagens')
