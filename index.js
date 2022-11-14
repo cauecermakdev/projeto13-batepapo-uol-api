@@ -34,9 +34,52 @@ const messageSchema = joi.object({
 	type: joi.string().required()
 });
 
+/* async function isThereParticipant(participantObj){
+	console.log(participantObj.name);
+	const isThere =  await dbUol.collection("participant").findOne({name:participantObj.name});
+	
+	console.log("isThere",isThere);
+	return isThere;
+} 
+ */
+async function userExists(userName){
+	const userExists = await dbUol
+	.collection("participants")
+	.findOne({name:userName});
+
+	/* console.log("userExists", userExists); */
+
+	if(userExists){
+		return true;
+	}
+}
+
+
 app.post('/participants', async (req, res) => {
 	const participantes = req.body;
 	console.log("participantes", participantes);
+	
+
+/* 	if(!isThereParticipant(participantes)){
+		res.sendStatus(409);
+		return
+	}  */
+
+	
+
+	if(await userExists(req.body.name)){
+		res.status(409).send('UserName já está logado!');
+		return;
+	};
+
+/* 	const userExists = await dbUol
+	.collection("participants")
+	.findOne({name:req.body.name});
+
+	if(userExists){
+		res.status(409).send('UserName já está logado!');
+		return;
+	} */
 
 	const validation = participantSchema.validate(participantes, { abortEarly: true });
 
@@ -68,26 +111,33 @@ app.get('/participants', async (req, res) => {
 
 app.post('/messages', async (req, res) => {
 	const user = req.headers.user;
-	console.log(">>>>>user from req is", user);
+	/* //console.log(">>>>>user from req is", user); */
 	const message = req.body;
 	let now_date = dayjs().format("HH:mm:ss");
+	console.log("post msg")
+	
+  	if(!(await userExists(user))){
+		console.log(user, "usuario nao participant, nao pode mandar msg");
+		return;
+	};  
+/* 	//console.log("****************")
+	//console.log("MESSAGE POST")
+	//console.log("now_date", now_date);
+	//console.log("message req.body", message);
+	//console.log("****************") */
 
-	console.log("****************")
-	console.log("MESSAGE POST")
-	console.log("now_date", now_date);
-	console.log("message req.body", message);
-	console.log("****************")
+/* 	await dbUOl.collection("participants").findOne({message.from}) */
 
 	const validation = messageSchema.validate(message, { abortEarly: true });
 
 	if (validation.error) {
-		res.status(422).send("DEu erro no post da message");
+		res.status(422).send("Deu erro no post da message");
 		return
 	}
 
 	try {
 		const isUser = await dbUol.collection('messages').findOne({ from: user });
-		/* console.log("********Is User", isUser); */
+		/* //console.log("********Is User", isUser); */
 		await dbUol.collection('messages').insertOne({ ...message, from: user, time: now_date })
 		res.sendStatus(201);
 	} catch (error) {
@@ -96,13 +146,25 @@ app.post('/messages', async (req, res) => {
 	}
 });
 
-app.get('/messages', async (req, res) => {
+function messageUserCanSee(messagesList, user){
+	
+	const messagesToUser = messagesList.filter((message) => (message.to === "Todos" || message.from === user || message.to === user || message.type === "message"));
+	console.log(messagesToUser);
+	return messagesToUser;
+}
 
+app.get('/messages', async (req, res) => {
+	const user = req.headers.user;
+
+	let limit = parseInt(req.query.limit);
+	if(!limit){
+		limit = 0;
+	}
+	
 	try {
 		const messageCollection = dbUol.collection("messages");
-		const messagesList = await messageCollection.find({}).toArray();
-
-		res.send(messagesList)
+		const messagesList = await messageCollection.find({}).limit(limit).toArray();
+		res.send(messageUserCanSee(messagesList,user))
 	} catch (error) {
 		res.status(500).send('Deu erro na requisicao das mensagens')
 	}
@@ -110,9 +172,22 @@ app.get('/messages', async (req, res) => {
 
 app.post('/status', async (req, res) => {
 	const user = req.headers.user;
-/* 	console.log("****************************")
-	console.log("USER STATUS", user);
-	console.log("****************************") */
+
+	const isUser = await dbUol.collection('participants').findOne({ name: user });
+	
+	if(!isUser){
+		console.log(user, "usuario nao existe");
+		return;
+	}
+
+/* 	if(!userExists(user.name)){
+		console.log("usuario nao existe");
+		return;
+	}; */
+
+/* 	//console.log("****************************")
+	//console.log("USER STATUS", user);
+	//console.log("****************************") */
 	const status = req.body;
 
 	/* const validation = messageSchema.validate(message, { abortEarly: true });  */
@@ -123,9 +198,10 @@ app.post('/status', async (req, res) => {
 		}  */
 
 	try {
-		const isUser = await dbUol.collection('participants').findOne({ name: user });
-		 console.log("********Is User na rota /status", isUser); 
-/* 		console.log("********Is User _ID", isUser._id); */
+		//const isUser = await dbUol.collection('participants').findOne({ name: user });
+		
+		 /* //console.log("********Is User na rota /status", isUser);  */
+/* 		//console.log("********Is User _ID", isUser._id); */
 		const statusUpdate_newobj = { ...isUser, lastStatus: Date.now() };
 
 		//teoria update é melhor. acho que assim vai escrever mais uma vez...
@@ -144,7 +220,7 @@ app.post('/status', async (req, res) => {
 });
 
 async function deleteUser(participantUser){
-	console.log(">>>>>>>>>>>>>>>>>>>>>>>>>> deleteUser() function <<<<<<<<<<<<<<<<<<<<<<<");
+	/* //console.log(">>>>>>>>>>>>>>>>>>>>>>>>>> deleteUser() function <<<<<<<<<<<<<<<<<<<<<<<"); */
 	const messageLogout = {
 		from: participantUser.name,
 		to: 'Todos',
@@ -165,30 +241,30 @@ async function deleteUser(participantUser){
 }
 
 function isOnline(participantUser){
-	/* console.log("\nentrou isOnline"); */
+	/* //console.log("\nentrou isOnline"); */
 
 	const timeOff = (Date.now()- participantUser.lastStatus);
 
 	if(timeOff > 15000){
 		deleteUser(participantUser);
-		console.log("\n\n\n\nuser deletado", participantUser.name);
+		/* //console.log("\n\n\n\nuser deletado", participantUser.name); */
 	}else{
-		console.log('isOnline True', participantUser.name)
+		//console.log('isOnline True', participantUser.name)
 		return true;
 	}
 }
 
 //removendo a cada 15 segundo participants inativos
 async function removeParticipantsOffline() {
-	console.log("entra removeParticipantsOffline");
+	/* //console.log("entra removeParticipantsOffline"); */
 	const allParticipants = await dbUol.collection('participants').find().toArray();
-	/* console.log("\n##allParticants",allParticipants);  */
+	/* //console.log("\n##allParticants",allParticipants);  */
 	const allParticipantsOnline = allParticipants.filter((participantUser) => isOnline(participantUser));
-	/* console.log("\n##allParticantsOnline",allParticipantsOnline); */
+	/* //console.log("\n##allParticantsOnline",allParticipantsOnline); */
 };
 
 
-setInterval(removeParticipantsOffline, 3000); 
+setInterval(removeParticipantsOffline, 15000); 
 
 app.listen(5000, () => {
 	console.log('Server is listening on port 5000.');

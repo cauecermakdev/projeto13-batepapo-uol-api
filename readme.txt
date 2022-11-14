@@ -1,5 +1,5 @@
 #Liga servidor 
-mongodb --dbpath ./mongo
+mongod --dbpath ~/.mongo
 
 #entra no servidor
 mongo
